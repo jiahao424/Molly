@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using RosterApi.Contracts.Auth;
 using RosterApi.Data;
 using RosterApi.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RosterApi.Controllers;
 
@@ -119,5 +120,26 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public ActionResult<CurrentUserResponse> Me()
+    {
+        var email = User.FindFirst(ClaimTypes.Email)?.Value;
+        var fullName = User.FindFirst(ClaimTypes.Name)?.Value;
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (string.IsNullOrWhiteSpace(email))
+            return Unauthorized();
+
+        var response = new CurrentUserResponse
+        {
+            Email = email,
+            FullName = fullName ?? string.Empty,
+            Role = role ?? string.Empty
+        };
+
+        return Ok(response);
     }
 }

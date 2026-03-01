@@ -9,6 +9,7 @@ namespace RosterApi.Controllers;
 
 [ApiController]
 [Route("api/users")]
+[Authorize(Roles = "Manager")]
 [Authorize]
 public class UsersController : ControllerBase
 {
