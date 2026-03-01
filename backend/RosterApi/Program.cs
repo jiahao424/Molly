@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RosterApi.Data;
 using Microsoft.OpenApi.Models;
+using RosterApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +84,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

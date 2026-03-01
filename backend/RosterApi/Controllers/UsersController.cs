@@ -29,7 +29,8 @@ public class UsersController : ControllerBase
                 Id = u.Id,
                 Email = u.Email,
                 Role = u.Role,
-                CreatedAtUtc = u.CreatedAtUtc
+                CreatedAtUtc = u.CreatedAtUtc,
+                FullName = u.FullName,
             })
             .ToListAsync();
 
@@ -49,7 +50,8 @@ public class UsersController : ControllerBase
             Id = user.Id,
             Email = user.Email,
             Role = user.Role,
-            CreatedAtUtc = user.CreatedAtUtc
+            CreatedAtUtc = user.CreatedAtUtc,
+            FullName = user.FullName,
         };
 
         return Ok(response);
