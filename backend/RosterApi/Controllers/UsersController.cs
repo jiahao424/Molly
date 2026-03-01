@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using RosterApi.Contracts.Users;
 using RosterApi.Data;
 using RosterApi.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RosterApi.Controllers;
 
 [ApiController]
 [Route("api/users")]
+[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -50,28 +52,5 @@ public class UsersController : ControllerBase
         };
 
         return Ok(response);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request)
-    {
-        var user = new User
-        {
-            Email = request.Email,
-            Role = "Employee"
-        };
-
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
-
-        var response = new UserResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            Role = user.Role,
-            CreatedAtUtc = user.CreatedAtUtc
-        };
-
-        return CreatedAtAction(nameof(GetById), new { id = user.Id }, response);
     }
 }
