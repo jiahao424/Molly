@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using RosterApi.Data;
 using RosterApi.Middleware;
 using RosterApi.Models;
+using RosterApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,9 @@ builder.Services.AddControllers();
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+//Email service
+builder.Services.AddHttpClient<EmailService>();
 
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();

@@ -1,4 +1,9 @@
-return Ok(new RegisterResponse
+namespace RosterApi.Contracts.Auth;
+
+public class AuthResponse
 {
-    Message = "Registration successful. Please check your email to verify your account."
-});
+    public string Token { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+}

@@ -10,6 +10,7 @@ using RosterApi.Contracts.Auth;
 using RosterApi.Data;
 using RosterApi.Models;
 using Microsoft.AspNetCore.Authorization;
+using RosterApi.Services;
 
 namespace RosterApi.Controllers;
 
@@ -19,11 +20,13 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly EmailService _emailService;
 
-    public AuthController(AppDbContext db, IConfiguration configuration)
+    public AuthController(AppDbContext db, IConfiguration configuration, EmailService emailService)
     {
         _db = db;
         _configuration = configuration;
+        _emailService = emailService;
     }
     
     private static string GenerateEmailVerificationToken()
@@ -32,7 +35,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
+    public async Task<ActionResult<RegisterResponse>> Register(RegisterRequest request)
     {
         var exists = await _db.Users.AnyAsync(u => u.Email == request.Email);
         if (exists)
@@ -56,8 +59,7 @@ public class AuthController : ControllerBase
         var verificationLink =
             $"http://localhost:5173/verify-email?email={Uri.EscapeDataString(user.Email)}&token={user.EmailVerificationToken}";
 
-        Console.WriteLine("EMAIL VERIFICATION LINK:");
-        Console.WriteLine(verificationLink);
+        await _emailService.SendVerificationEmailAsync(user.Email, verificationLink);
 
         return Ok(new RegisterResponse
         {
@@ -203,8 +205,7 @@ public class AuthController : ControllerBase
         var verificationLink =
             $"http://localhost:5173/verify-email?email={Uri.EscapeDataString(user.Email)}&token={user.EmailVerificationToken}";
 
-        Console.WriteLine("RESEND EMAIL VERIFICATION LINK:");
-        Console.WriteLine(verificationLink);
+        await _emailService.SendVerificationEmailAsync(user.Email, verificationLink);
 
         return Ok(new
         {
