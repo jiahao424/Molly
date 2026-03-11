@@ -1,0 +1,31 @@
+import { CssBaseline } from "@mui/material";
+import { Navigate, Route, Routes } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import ManagerDashboardPage from "./pages/ManagerDashboardPage";
+import EmployeeDashboardPage from "./pages/EmployeeDashboardPage";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import RoleRoute from "./routes/RoleRoute";
+
+export default function App() {
+  return (
+    <>
+      <CssBaseline />
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<RoleRoute allowedRole="Manager" />}>
+            <Route path="/manager" element={<ManagerDashboardPage />} />
+          </Route>
+
+          <Route element={<RoleRoute allowedRole="Employee" />}>
+            <Route path="/employee" element={<EmployeeDashboardPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
+  );
+}
