@@ -5,6 +5,7 @@ import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import EmployeeDashboardPage from "./pages/EmployeeDashboardPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import StoreDashboardPage from "./pages/StoreDashboardPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<RoleRoute allowedRole="Manager" />}>
             <Route path="/manager" element={<ManagerDashboardPage />} />
+            <Route path="/manager/stores/:storeId" element={<StoreDashboardPage />} />
           </Route>
 
           <Route element={<RoleRoute allowedRole="Employee" />}>

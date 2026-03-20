@@ -37,15 +37,17 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<RegisterResponse>> Register(RegisterRequest request)
     {
-        var exists = await _db.Users.AnyAsync(u => u.Email == request.Email);
+        var normalizedEmail = request.Email.Trim().ToLower();
+        var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
+
         if (exists)
             return Conflict("A user with this email already exists.");
 
         var emailVerificationToken = GenerateEmailVerificationToken();
         var user = new User
         {
-            Email = request.Email,
-            FullName = request.FullName,
+            Email = normalizedEmail,
+            FullName = request.FullName.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "Employee",
             EmailConfirmed = false,
@@ -70,7 +72,8 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+        var normalizedEmail = request.Email.Trim().ToLower();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
 
         if (user == null)
             return Unauthorized("Invalid email or password.");
