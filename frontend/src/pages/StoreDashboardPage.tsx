@@ -1,62 +1,30 @@
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
   Container,
-  Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Grid,
-  List,
-  ListItem,
-  ListItemText,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-type DashboardStats = {
-  totalStaff: number;
-  availabilitySubmitted: number;
-  totalStaffExpected: number;
-  unassignedShifts: number;
-  scheduledHours: number;
-};
-
-type AlertItem = {
-  id: string;
-  message: string;
-  severity: "warning" | "error" | "info";
-};
-
-type DayPreview = {
-  dayName: string;
-  dateLabel: string;
-  shiftCount: number;
-  unassignedCount: number;
-  hasConflict: boolean;
-};
-
-type SnapshotItem = {
-  label: string;
-  value: string;
-};
-
-type StoreDashboardData = {
-  store: {
-    id: string;
-    name: string;
-    location: string;
-    status: "Open" | "Closed" | "Setup";
-    weekLabel: string;
-  };
-  stats: DashboardStats;
-  alerts: AlertItem[];
-  nextWeekPreview: DayPreview[];
-  snapshot: SnapshotItem[];
-};
+import {
+  createNextRosterWeek,
+  getRosterWeeks,
+  type RosterWeek,
+} from "../services/rosterWeeks";
+import { getStores, type StoreDto, type StoreStatus } from "../services/stores";
+import { getUsers, type UserDto } from "../services/users";
 
 function StatCard({
   title,
@@ -86,340 +54,179 @@ function StatCard({
   );
 }
 
-function AlertLevelChip({
-  severity,
-}: {
-  severity: AlertItem["severity"];
-}) {
-  if (severity === "error") {
-    return <Chip label="High" color="error" size="small" />;
-  }
+function formatLocalDateTimeInput(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
 
-  if (severity === "warning") {
-    return <Chip label="Medium" color="warning" size="small" />;
-  }
-
-  return <Chip label="Info" color="info" size="small" />;
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
-function getStoreStatusChipColor(status: StoreDashboardData["store"]["status"]) {
+function localDateTimeToUtcIso(localDateTimeValue: string): string {
+  return new Date(localDateTimeValue).toISOString();
+}
+
+function getStoreStatusChipColor(status: StoreStatus) {
   switch (status) {
-    case "Open":
+    case "Active":
       return "success";
-    case "Closed":
-      return "default";
-    case "Setup":
+    case "Needs Attention":
       return "warning";
+    case "Setup":
+      return "default";
     default:
       return "default";
   }
 }
 
-const mockStoreDashboards: Record<string, StoreDashboardData> = {
-  "store-1": {
-    store: {
-      id: "store-1",
-      name: "Chatswood Store",
-      location: "Sydney NSW",
-      status: "Open",
-      weekLabel: "23 Mar - 29 Mar",
-    },
-    stats: {
-      totalStaff: 18,
-      availabilitySubmitted: 12,
-      totalStaffExpected: 18,
-      unassignedShifts: 5,
-      scheduledHours: 126,
-    },
-    alerts: [
-      {
-        id: "1",
-        message: "3 employees have not submitted availability for next week.",
-        severity: "warning",
-      },
-      {
-        id: "2",
-        message: "Friday dinner shift is understaffed.",
-        severity: "error",
-      },
-      {
-        id: "3",
-        message: "1 scheduled shift conflicts with approved leave.",
-        severity: "info",
-      },
-    ],
-    nextWeekPreview: [
-      {
-        dayName: "Mon",
-        dateLabel: "23 Mar",
-        shiftCount: 4,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Tue",
-        dateLabel: "24 Mar",
-        shiftCount: 5,
-        unassignedCount: 1,
-        hasConflict: false,
-      },
-      {
-        dayName: "Wed",
-        dateLabel: "25 Mar",
-        shiftCount: 4,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Thu",
-        dateLabel: "26 Mar",
-        shiftCount: 5,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Fri",
-        dateLabel: "27 Mar",
-        shiftCount: 7,
-        unassignedCount: 2,
-        hasConflict: false,
-      },
-      {
-        dayName: "Sat",
-        dateLabel: "28 Mar",
-        shiftCount: 8,
-        unassignedCount: 0,
-        hasConflict: true,
-      },
-      {
-        dayName: "Sun",
-        dateLabel: "29 Mar",
-        shiftCount: 6,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-    ],
-    snapshot: [
-      { label: "On shift now", value: "Alice Chen, Kevin Wang" },
-      { label: "Next shift starts", value: "5:00 PM" },
-      { label: "Shift changes pending", value: "2 requests" },
-    ],
-  },
-  "store-2": {
-    store: {
-      id: "store-2",
-      name: "Burwood Store",
-      location: "Sydney NSW",
-      status: "Open",
-      weekLabel: "23 Mar - 29 Mar",
-    },
-    stats: {
-      totalStaff: 11,
-      availabilitySubmitted: 9,
-      totalStaffExpected: 11,
-      unassignedShifts: 2,
-      scheduledHours: 84,
-    },
-    alerts: [
-      {
-        id: "1",
-        message: "2 employees still need to submit availability.",
-        severity: "warning",
-      },
-      {
-        id: "2",
-        message: "Saturday lunch shift still needs one more staff member.",
-        severity: "info",
-      },
-    ],
-    nextWeekPreview: [
-      {
-        dayName: "Mon",
-        dateLabel: "23 Mar",
-        shiftCount: 3,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Tue",
-        dateLabel: "24 Mar",
-        shiftCount: 3,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Wed",
-        dateLabel: "25 Mar",
-        shiftCount: 4,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Thu",
-        dateLabel: "26 Mar",
-        shiftCount: 4,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-      {
-        dayName: "Fri",
-        dateLabel: "27 Mar",
-        shiftCount: 5,
-        unassignedCount: 1,
-        hasConflict: false,
-      },
-      {
-        dayName: "Sat",
-        dateLabel: "28 Mar",
-        shiftCount: 5,
-        unassignedCount: 1,
-        hasConflict: false,
-      },
-      {
-        dayName: "Sun",
-        dateLabel: "29 Mar",
-        shiftCount: 4,
-        unassignedCount: 0,
-        hasConflict: false,
-      },
-    ],
-    snapshot: [
-      { label: "On shift now", value: "Jenny Chen, Tomy" },
-      { label: "Next shift starts", value: "4:30 PM" },
-      { label: "Shift changes pending", value: "1 request" },
-    ],
-  },
-};
-
-const fallbackDashboard: StoreDashboardData = {
-  store: {
-    id: "unknown",
-    name: "Unknown Store",
-    location: "Unknown Location",
-    status: "Setup",
-    weekLabel: "23 Mar - 29 Mar",
-  },
-  stats: {
-    totalStaff: 0,
-    availabilitySubmitted: 0,
-    totalStaffExpected: 0,
-    unassignedShifts: 0,
-    scheduledHours: 0,
-  },
-  alerts: [
-    {
-      id: "1",
-      message: "No dashboard data found for this store yet.",
-      severity: "info",
-    },
-  ],
-  nextWeekPreview: [
-    {
-      dayName: "Mon",
-      dateLabel: "23 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Tue",
-      dateLabel: "24 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Wed",
-      dateLabel: "25 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Thu",
-      dateLabel: "26 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Fri",
-      dateLabel: "27 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Sat",
-      dateLabel: "28 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-    {
-      dayName: "Sun",
-      dateLabel: "29 Mar",
-      shiftCount: 0,
-      unassignedCount: 0,
-      hasConflict: false,
-    },
-  ],
-  snapshot: [
-    { label: "On shift now", value: "-" },
-    { label: "Next shift starts", value: "-" },
-    { label: "Shift changes pending", value: "0 requests" },
-  ],
-};
-
 export default function StoreDashboardPage() {
   const navigate = useNavigate();
   const { storeId } = useParams<{ storeId: string }>();
 
-  const dashboardData = useMemo(() => {
-    if (!storeId) {
-      return fallbackDashboard;
-    }
+  const [store, setStore] = useState<StoreDto | null>(null);
+  const [loadingStore, setLoadingStore] = useState(false);
+  const [storeError, setStoreError] = useState("");
 
-    return mockStoreDashboards[storeId] ?? {
-      ...fallbackDashboard,
-      store: {
-        ...fallbackDashboard.store,
-        id: storeId,
-      },
-    };
+  const [rosterWeeks, setRosterWeeks] = useState<RosterWeek[]>([]);
+  const [loadingRosterWeeks, setLoadingRosterWeeks] = useState(false);
+  const [rosterWeeksError, setRosterWeeksError] = useState("");
+
+  const [openPublishDialog, setOpenPublishDialog] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishError, setPublishError] = useState("");
+  const [availabilityCloseAtLocal, setAvailabilityCloseAtLocal] = useState("");
+  const [users, setUsers] = useState<UserDto[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
+
+  const fetchStore = async () => {
+    if (!storeId) return;
+
+    try {
+      setLoadingStore(true);
+      setStoreError("");
+
+      const stores = await getStores();
+      const matchedStore = stores.find((item) => item.id === storeId) ?? null;
+
+      setStore(matchedStore);
+
+      if (!matchedStore) {
+        setStoreError("Store not found.");
+      }
+    } catch (error: any) {
+      console.error("Failed to fetch store:", error);
+      setStoreError(
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to load store details."
+      );
+    } finally {
+      setLoadingStore(false);
+    }
+  };
+
+  const fetchRosterWeeks = async () => {
+    if (!storeId) return;
+
+    try {
+      setLoadingRosterWeeks(true);
+      setRosterWeeksError("");
+      const data = await getRosterWeeks(storeId);
+      setRosterWeeks(data);
+    } catch (error: any) {
+      console.error("Failed to fetch roster weeks:", error);
+      setRosterWeeksError(
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to load roster weeks."
+      );
+    } finally {
+      setLoadingRosterWeeks(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      setUsersError("");
+
+      const data = await getUsers();
+      setUsers(data);
+    } catch (error: any) {
+      console.error("Failed to fetch users:", error);
+      setUsersError(
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to load users."
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!storeId) return;
+
+    fetchStore();
+    fetchRosterWeeks();
+    fetchUsers();
   }, [storeId]);
 
   const handleBackToManager = () => {
     navigate("/manager");
   };
 
-  const handleOpenRosterEditor = () => {
-    console.log("Open roster editor for store:", storeId);
-  };
-
   const handleViewAvailability = () => {
     console.log("View availability for store:", storeId);
   };
 
-  const handleOpenFullEditor = () => {
-    console.log("Open full editor for store:", storeId);
+  const handleOpenRosterEditor = () => {
+    console.log("Open roster editor for store:", storeId);
   };
 
-  const handleCopyLastWeek = () => {
-    console.log("Copy last week for store:", storeId);
+  const handleOpenPublishAvailabilityDialog = () => {
+    const defaultClose = new Date();
+    defaultClose.setDate(defaultClose.getDate() + 2);
+    defaultClose.setHours(18, 0, 0, 0);
+
+    setAvailabilityCloseAtLocal(formatLocalDateTimeInput(defaultClose));
+    setPublishError("");
+    setOpenPublishDialog(true);
   };
 
-  const handleAutoFill = () => {
-    console.log("Auto-fill shifts for store:", storeId);
+  const handlePublishAvailabilityCollection = async () => {
+    if (!storeId) return;
+
+    try {
+      setPublishLoading(true);
+      setPublishError("");
+
+      await createNextRosterWeek(storeId, {
+        availabilityCloseAtUtc: localDateTimeToUtcIso(availabilityCloseAtLocal),
+      });
+
+      setOpenPublishDialog(false);
+      setAvailabilityCloseAtLocal("");
+      await fetchRosterWeeks();
+    } catch (error: any) {
+      setPublishError(
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to publish availability collection."
+      );
+    } finally {
+      setPublishLoading(false);
+    }
   };
 
-  const handleCreateShift = () => {
-    console.log("Create shift for store:", storeId);
-  };
-
-  const handlePublishSchedule = () => {
-    console.log("Publish schedule for store:", storeId);
-  };
+  const totalStaff = storeId
+  ? users.filter((user) =>
+      user.stores.some((store) => store.id === storeId)
+    ).length
+  : 0;
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -444,32 +251,49 @@ export default function StoreDashboardPage() {
             >
               <Box>
                 <Typography variant="h4" fontWeight={700}>
-                  {dashboardData.store.name}
+                  {loadingStore ? "Loading store..." : store?.name ?? "Store Dashboard"}
                 </Typography>
 
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ mt: 1 }}
+                  flexWrap="wrap"
+                  alignItems="center"
+                >
                   <Typography variant="body1" color="text.secondary">
-                    {dashboardData.store.location}
+                    {store?.location ?? "Store details not loaded yet"}
                   </Typography>
 
-                  <Chip
-                    label={dashboardData.store.status}
-                    color={getStoreStatusChipColor(dashboardData.store.status)}
-                    size="small"
-                  />
-
-                  <Chip
-                    label={`Week of ${dashboardData.store.weekLabel}`}
-                    variant="outlined"
-                    size="small"
-                  />
+                  {store?.status ? (
+                    <Chip
+                      label={store.status}
+                      color={getStoreStatusChipColor(store.status)}
+                      size="small"
+                    />
+                  ) : null}
                 </Stack>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Manage availability collection and roster workflow for this store.
+                </Typography>
+
+                {storeError ? (
+                  <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                    {storeError}
+                  </Typography>
+                ) : null}
               </Box>
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <Button variant="contained" onClick={handleOpenPublishAvailabilityDialog}>
+                  Publish Availability Collection
+                </Button>
+
                 <Button variant="outlined" onClick={handleViewAvailability}>
                   View Availability
                 </Button>
+
                 <Button variant="contained" onClick={handleOpenRosterEditor}>
                   Edit Next Week Roster
                 </Button>
@@ -478,164 +302,168 @@ export default function StoreDashboardPage() {
           </CardContent>
         </Card>
 
+        <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              spacing={2}
+              sx={{ mb: 2 }}
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  Availability Collection Status
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Track published roster weeks and submission deadlines.
+                </Typography>
+              </Box>
+
+              <Button variant="contained" onClick={handleOpenPublishAvailabilityDialog}>
+                Publish New Collection
+              </Button>
+            </Stack>
+
+            {rosterWeeksError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {rosterWeeksError}
+              </Alert>
+            ) : null}
+
+            {loadingRosterWeeks ? (
+              <Typography variant="body2" color="text.secondary">
+                Loading roster weeks...
+              </Typography>
+            ) : rosterWeeks.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No roster week has been published for this store yet.
+              </Typography>
+            ) : (
+              <Stack spacing={2}>
+                {rosterWeeks.map((week) => (
+                  <Paper key={week.id} variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+                    <Stack
+                      direction={{ xs: "column", md: "row" }}
+                      justifyContent="space-between"
+                      spacing={1}
+                    >
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          {week.weekStartDate} to {week.weekEndDate}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                          Status: {week.status}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                          Availability opens at{" "}
+                          {new Date(week.availabilityOpenAtUtc).toLocaleString()}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                          Availability closes at{" "}
+                          {new Date(week.availabilityCloseAtUtc).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <StatCard
               title="Total Staff"
-              value={String(dashboardData.stats.totalStaff)}
-              subtitle="Active employees in this store"
+              value={loadingUsers ? "..." : String(totalStaff)}
+              subtitle={usersError ? "Failed to load staff" : "Employees assigned to this store"}
             />
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <StatCard
-              title="Availability Submitted"
-              value={`${dashboardData.stats.availabilitySubmitted}/${dashboardData.stats.totalStaffExpected}`}
-              subtitle="For next week"
+              title="Pending Requests"
+              value={store?.pendingRequests != null ? String(store.pendingRequests) : "-"}
+              subtitle="From store summary"
             />
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <StatCard
-              title="Unassigned Shifts"
-              value={String(dashboardData.stats.unassignedShifts)}
-              subtitle="Still need coverage"
+              title="Roster Weeks"
+              value={String(rosterWeeks.length)}
+              subtitle="Published for this store"
             />
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <StatCard
-              title="Scheduled Hours"
-              value={`${dashboardData.stats.scheduledHours}h`}
-              subtitle="Planned for next week"
+              title="Latest Updated"
+              value={
+                store?.updatedAtUtc
+                  ? new Date(store.updatedAtUtc).toLocaleDateString()
+                  : "-"
+              }
+              subtitle="Store record update"
             />
           </Grid>
         </Grid>
 
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, lg: 8 }}>
-            <Card sx={{ height: "100%", borderRadius: 4, boxShadow: 2 }}>
-              <CardContent sx={{ p: 3 }}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ mb: 2 }}
-                >
-                  <Typography variant="h6" fontWeight={700}>
-                    Next Week Roster Preview
-                  </Typography>
+        <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+              Next Week Roster Preview
+            </Typography>
 
-                  <Button size="small" onClick={handleOpenFullEditor}>
-                    Open Full Editor
-                  </Button>
-                </Stack>
+            <Typography variant="body2" color="text.secondary">
+              This section is not connected yet. It will show daily roster preview once
+              the roster editor and shift data APIs are ready.
+            </Typography>
+          </CardContent>
+        </Card>
 
-                <Grid container spacing={2}>
-                  {dashboardData.nextWeekPreview.map((day) => (
-                    <Grid
-                      key={`${day.dayName}-${day.dateLabel}`}
-                      size={{ xs: 12, sm: 6, md: 4 }}
-                    >
-                      <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
-                        <CardContent>
-                          <Stack spacing={1}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                              {day.dayName}
-                            </Typography>
+        <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+              Attention Needed
+            </Typography>
 
-                            <Typography variant="body2" color="text.secondary">
-                              {day.dateLabel}
-                            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              This section is not connected yet. It will show missing availability,
+              conflicts, and understaffed shifts later.
+            </Typography>
+          </CardContent>
+        </Card>
 
-                            <Divider sx={{ my: 1 }} />
+        <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+              Quick Actions
+            </Typography>
 
-                            <Typography variant="body2">
-                              Shifts: <strong>{day.shiftCount}</strong>
-                            </Typography>
+            <Stack spacing={2}>
+              <Button variant="outlined" fullWidth disabled>
+                Copy Last Week
+              </Button>
 
-                            <Typography variant="body2">
-                              Unassigned: <strong>{day.unassignedCount}</strong>
-                            </Typography>
+              <Button variant="outlined" fullWidth disabled>
+                Auto-fill from Availability
+              </Button>
 
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
-                              {day.unassignedCount > 0 ? (
-                                <Chip
-                                  label="Needs Coverage"
-                                  color="warning"
-                                  size="small"
-                                />
-                              ) : (
-                                <Chip label="Covered" color="success" size="small" />
-                              )}
+              <Button variant="outlined" fullWidth disabled>
+                Create Shift
+              </Button>
 
-                              {day.hasConflict ? (
-                                <Chip label="Conflict" color="error" size="small" />
-                              ) : null}
-                            </Stack>
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 4 }}>
-            <Stack spacing={3}>
-              <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                    Attention Needed
-                  </Typography>
-
-                  <List disablePadding>
-                    {dashboardData.alerts.map((alert, index) => (
-                      <Box key={alert.id}>
-                        <ListItem
-                          disableGutters
-                          secondaryAction={<AlertLevelChip severity={alert.severity} />}
-                        >
-                          <ListItemText primary={alert.message} />
-                        </ListItem>
-
-                        {index < dashboardData.alerts.length - 1 ? <Divider /> : null}
-                      </Box>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-
-              <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                    Quick Actions
-                  </Typography>
-
-                  <Stack spacing={2}>
-                    <Button variant="contained" fullWidth onClick={handleCopyLastWeek}>
-                      Copy Last Week
-                    </Button>
-
-                    <Button variant="outlined" fullWidth onClick={handleAutoFill}>
-                      Auto-fill from Availability
-                    </Button>
-
-                    <Button variant="outlined" fullWidth onClick={handleCreateShift}>
-                      Create Shift
-                    </Button>
-
-                    <Button variant="outlined" fullWidth onClick={handlePublishSchedule}>
-                      Publish Schedule
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
+              <Button variant="outlined" fullWidth disabled>
+                Publish Schedule
+              </Button>
             </Stack>
-          </Grid>
-        </Grid>
+          </CardContent>
+        </Card>
 
         <Card sx={{ borderRadius: 4, boxShadow: 2 }}>
           <CardContent sx={{ p: 3 }}>
@@ -643,24 +471,52 @@ export default function StoreDashboardPage() {
               This Week Snapshot
             </Typography>
 
-            <Grid container spacing={2}>
-              {dashboardData.snapshot.map((item) => (
-                <Grid key={item.label} size={{ xs: 12, md: 4 }}>
-                  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, height: "100%" }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.label}
-                    </Typography>
-
-                    <Typography variant="h6" fontWeight={600} sx={{ mt: 1 }}>
-                      {item.value}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
+            <Typography variant="body2" color="text.secondary">
+              This section is not connected yet. It will show current shift snapshot and
+              pending changes later.
+            </Typography>
           </CardContent>
         </Card>
       </Stack>
+
+      <Dialog
+        open={openPublishDialog}
+        onClose={() => setOpenPublishDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Publish Availability Collection for Next Week</DialogTitle>
+
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Choose when employee availability submissions will close.
+            </Typography>
+
+            <TextField
+              label="Availability Close Time"
+              type="datetime-local"
+              value={availabilityCloseAtLocal}
+              onChange={(e) => setAvailabilityCloseAtLocal(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+
+            {publishError ? <Alert severity="error">{publishError}</Alert> : null}
+          </Stack>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setOpenPublishDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handlePublishAvailabilityCollection}
+            disabled={publishLoading || !availabilityCloseAtLocal}
+          >
+            {publishLoading ? "Publishing..." : "Publish"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

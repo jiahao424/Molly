@@ -15,4 +15,6 @@ public class Store
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<User> Users { get; set; } = new List<User>();
+
+    public ICollection<RosterWeek> RosterWeeks { get; set; } = new List<RosterWeek>();
 }

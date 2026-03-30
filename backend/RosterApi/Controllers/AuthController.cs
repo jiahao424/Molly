@@ -133,7 +133,8 @@ public class AuthController : ControllerBase
     [Authorize]
     public ActionResult<CurrentUserResponse> Me()
     {
-        var email = User.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
+        var email = User.FindFirst(ClaimTypes.Email)?.Value
+         ?? User.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
         var fullName = User.FindFirst(ClaimTypes.Name)?.Value;
         var role = User.FindFirst(ClaimTypes.Role)?.Value;
 

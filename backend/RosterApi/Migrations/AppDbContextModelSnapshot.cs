@@ -22,6 +22,118 @@ namespace RosterApi.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("RosterApi.Models.AvailabilitySlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AvailabilitySubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShiftType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SlotType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailabilitySubmissionId");
+
+                    b.ToTable("AvailabilitySlots");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.AvailabilitySubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("RosterWeekId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("SubmittedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RosterWeekId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("UserId", "RosterWeekId")
+                        .IsUnique();
+
+                    b.ToTable("AvailabilitySubmissions");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.RosterWeek", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AvailabilityCloseAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("AvailabilityOpenAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoreId", "WeekStartDate")
+                        .IsUnique();
+
+                    b.ToTable("RosterWeeks");
+                });
+
             modelBuilder.Entity("RosterApi.Models.Store", b =>
                 {
                     b.Property<Guid>("Id")
@@ -112,6 +224,55 @@ namespace RosterApi.Migrations
                     b.ToTable("UserStore");
                 });
 
+            modelBuilder.Entity("RosterApi.Models.AvailabilitySlot", b =>
+                {
+                    b.HasOne("RosterApi.Models.AvailabilitySubmission", "AvailabilitySubmission")
+                        .WithMany("Slots")
+                        .HasForeignKey("AvailabilitySubmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AvailabilitySubmission");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.AvailabilitySubmission", b =>
+                {
+                    b.HasOne("RosterApi.Models.RosterWeek", "RosterWeek")
+                        .WithMany("AvailabilitySubmissions")
+                        .HasForeignKey("RosterWeekId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RosterApi.Models.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RosterApi.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RosterWeek");
+
+                    b.Navigation("Store");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.RosterWeek", b =>
+                {
+                    b.HasOne("RosterApi.Models.Store", "Store")
+                        .WithMany("RosterWeeks")
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Store");
+                });
+
             modelBuilder.Entity("UserStore", b =>
                 {
                     b.HasOne("RosterApi.Models.Store", null)
@@ -125,6 +286,21 @@ namespace RosterApi.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RosterApi.Models.AvailabilitySubmission", b =>
+                {
+                    b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.RosterWeek", b =>
+                {
+                    b.Navigation("AvailabilitySubmissions");
+                });
+
+            modelBuilder.Entity("RosterApi.Models.Store", b =>
+                {
+                    b.Navigation("RosterWeeks");
                 });
 #pragma warning restore 612, 618
         }
