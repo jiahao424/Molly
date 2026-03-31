@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Alert,
   AppBar,
   Avatar,
   Box,
@@ -87,6 +88,8 @@ const mapUserDtoToEmployee = (user: UserDto): Employee => ({
 });
 
 export default function ManagerDashboardPage() {
+  const DEFAULT_INITIAL_PASSWORD = "123456";
+
   const navigate = useNavigate();
 
   const [stores, setStores] = useState<Store[]>([]);
@@ -112,6 +115,7 @@ export default function ManagerDashboardPage() {
   const [newEmployeeStaffType, setNewEmployeeStaffType] =
     useState<StaffType>("Regular");
   const [newEmployeeStoreIds, setNewEmployeeStoreIds] = useState<string[]>([]);
+  const [createEmployeeError, setCreateEmployeeError] = useState("");
 
   // delete employee dialog
   const [openDeleteEmployee, setOpenDeleteEmployee] = useState(false);
@@ -226,6 +230,7 @@ export default function ManagerDashboardPage() {
   };
 
   const handleOpenAddEmployee = () => {
+    setCreateEmployeeError("");
     setOpenAddEmployee(true);
   };
 
@@ -235,18 +240,22 @@ export default function ManagerDashboardPage() {
     setNewEmployeeEmail("");
     setNewEmployeeStaffType("Regular");
     setNewEmployeeStoreIds([]);
+    setCreateEmployeeError("");
   };
 
   const handleCreateEmployee = async () => {
     const trimmedName = newEmployeeName.trim();
     const trimmedEmail = newEmployeeEmail.trim();
 
-    if (!trimmedName || !trimmedEmail || newEmployeeStoreIds.length === 0) return;
+    if (!trimmedName || !trimmedEmail || newEmployeeStoreIds.length === 0)
+      return;
 
     try {
+      setCreateEmployeeError("");
       await createUser({
         fullName: trimmedName,
         email: trimmedEmail,
+        password: DEFAULT_INITIAL_PASSWORD,
         role: "Employee",
         staffType: newEmployeeStaffType as ApiStaffType,
         storeIds: newEmployeeStoreIds,
@@ -256,7 +265,9 @@ export default function ManagerDashboardPage() {
       await loadEmployees();
     } catch (error) {
       console.error("handleCreateEmployee error:", error);
-      alert("Failed to create employee.");
+      const responseData = (error as any)?.response?.data;
+      const apiError = responseData?.detail || responseData?.message || responseData;
+      setCreateEmployeeError(apiError || "Failed to create employee.");
     }
   };
 
@@ -826,6 +837,8 @@ export default function ManagerDashboardPage() {
         <DialogTitle>Add Employee</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
+            {createEmployeeError ? <Alert severity="error">{createEmployeeError}</Alert> : null}
+
             <TextField
               label="Full Name"
               value={newEmployeeName}
@@ -840,6 +853,10 @@ export default function ManagerDashboardPage() {
               onChange={(e) => setNewEmployeeEmail(e.target.value)}
               fullWidth
             />
+
+            <Typography variant="body2" color="text.secondary">
+              Initial password will be set to: {DEFAULT_INITIAL_PASSWORD}
+            </Typography>
 
             <Select
               multiple

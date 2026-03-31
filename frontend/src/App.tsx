@@ -7,6 +7,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import StoreDashboardPage from "./pages/StoreDashboardPage";
 import EmployeeAvailabilityPage from "./pages/EmployeeAvailabilityPage";
+import StoreAvailabilityPage from "./pages/StoreAvailabilityPage"
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route element={<RoleRoute allowedRole="Manager" />}>
             <Route path="/manager" element={<ManagerDashboardPage />} />
             <Route path="/manager/stores/:storeId" element={<StoreDashboardPage />} />
+            <Route path="/manager/stores/:storeId/roster-weeks/:rosterWeekId/availability" element={<StoreAvailabilityPage/>}/>
           </Route>
 
           <Route element={<RoleRoute allowedRole="Employee" />}>

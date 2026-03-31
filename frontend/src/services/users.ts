@@ -22,6 +22,7 @@ export type UserDto = {
 export type CreateUserRequest = {
   fullName: string;
   email: string;
+  password: string;
   role: string;
   staffType: StaffType;
   storeIds: string[];

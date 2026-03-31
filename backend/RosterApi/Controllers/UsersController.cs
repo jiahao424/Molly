@@ -13,6 +13,8 @@ namespace RosterApi.Controllers;
 [Authorize(Roles = "Manager")]
 public class UsersController : ControllerBase
 {
+    private const string DefaultInitialPassword = "123456";
+
     private readonly AppDbContext _db;
     private readonly EmailService _emailService;
     private readonly IConfiguration _configuration;
@@ -99,8 +101,9 @@ public class UsersController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest("Email is required.");
 
-        if (string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest("Password is required.");
+        var passwordToUse = string.IsNullOrWhiteSpace(request.Password)
+            ? DefaultInitialPassword
+            : request.Password;
 
         var normalizedEmail = request.Email.Trim().ToLower();
 
@@ -121,7 +124,7 @@ public class UsersController : ControllerBase
         {
             Email = normalizedEmail,
             FullName = request.FullName.Trim(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordToUse),
             Role = string.IsNullOrWhiteSpace(request.Role) ? "Employee" : request.Role.Trim(),
             StaffType = string.IsNullOrWhiteSpace(request.StaffType) ? "Regular" : request.StaffType.Trim(),
             EmailConfirmed = false,

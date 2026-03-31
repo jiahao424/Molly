@@ -10,7 +10,6 @@ namespace RosterApi.Controllers;
 
 [ApiController]
 [Route("api/roster-weeks/{rosterWeekId:guid}/availability-submission")]
-[Authorize(Roles = "Employee")]
 public class AvailabilitySubmissionsController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -21,6 +20,7 @@ public class AvailabilitySubmissionsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Employee")]
     public async Task<ActionResult<AvailabilitySubmissionResponse>> GetMyAvailability(Guid rosterWeekId)
     {
         var userId = GetCurrentUserId();
@@ -44,6 +44,7 @@ public class AvailabilitySubmissionsController : ControllerBase
     }
 
     [HttpPut]
+    [Authorize(Roles = "Employee")]
     public async Task<ActionResult<AvailabilitySubmissionResponse>> UpsertMyAvailability(
         Guid rosterWeekId,
         [FromBody] SubmitAvailabilityRequest request)
@@ -303,5 +304,60 @@ public class AvailabilitySubmissionsController : ControllerBase
             UpdatedAtUtc = submission.UpdatedAtUtc,
             Slots = groupedDays
         };
+    }
+
+    [HttpGet("/api/stores/{storeId:guid}/roster-weeks/{rosterWeekId:guid}/availability-submissions")]
+    [Authorize(Roles = "Manager")]
+    public async Task<ActionResult<List<RosterWeekAvailabilitySubmissionResponse>>> GetRosterWeekAvailabilitySubmissions(
+        Guid storeId,
+        Guid rosterWeekId)
+    {
+        var rosterWeek = await _db.RosterWeeks
+            .FirstOrDefaultAsync(rw => rw.Id == rosterWeekId && rw.StoreId == storeId);
+
+        if (rosterWeek == null)
+        {
+            return NotFound("Roster week not found.");
+        }
+
+        var submissions = await _db.AvailabilitySubmissions
+            .Include(a => a.Slots)
+            .Include(a => a.User)
+            .Where(a => a.StoreId == storeId && a.RosterWeekId == rosterWeekId)
+            .OrderBy(a => a.User.FullName)
+            .ToListAsync();
+
+        var response = submissions.Select(submission => new RosterWeekAvailabilitySubmissionResponse
+        {
+            Id = submission.Id,
+            UserId = submission.UserId,
+            UserName = submission.User.FullName,
+            UserEmail = submission.User.Email,
+            StoreId = submission.StoreId,
+            RosterWeekId = submission.RosterWeekId,
+            Status = submission.Status,
+            Note = submission.Note,
+            SubmittedAtUtc = submission.SubmittedAtUtc,
+            UpdatedAtUtc = submission.UpdatedAtUtc,
+            Days = submission.Slots
+                .GroupBy(s => s.Date)
+                .Select(group =>
+                {
+                    var availableSlot = group.FirstOrDefault(s => s.SlotType == "Available");
+                    var preferredSlot = group.FirstOrDefault(s => s.SlotType == "Preferred");
+
+                    return new RosterWeekAvailabilityDayResponse
+                    {
+                        Date = group.Key,
+                        AvailableShiftType = availableSlot?.ShiftType ?? "None",
+                        PreferredShiftType = preferredSlot?.ShiftType ?? "None",
+                        Note = availableSlot?.Note ?? preferredSlot?.Note
+                    };
+                })
+                .OrderBy(x => x.Date)
+                .ToList()
+        }).ToList();
+
+        return Ok(response);
     }
 }

@@ -42,3 +42,34 @@ export const getRosterWeekDetail = async (
   );
   return response.data;
 };
+
+export type RosterWeekAvailabilityDayResponse = {
+  date: string;
+  availableShiftType: "None" | "Morning" | "Evening" | "HalfDay" | "FullDay";
+  preferredShiftType: "None" | "Morning" | "Evening" | "FullDay";
+  note: string | null;
+};
+
+export type RosterWeekAvailabilitySubmissionResponse = {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  storeId: string;
+  rosterWeekId: string;
+  status: string;
+  note: string | null;
+  submittedAtUtc: string | null;
+  updatedAtUtc: string;
+  days: RosterWeekAvailabilityDayResponse[];
+};
+
+export const getRosterWeekAvailabilitySubmissions = async (
+  storeId: string,
+  rosterWeekId: string
+): Promise<RosterWeekAvailabilitySubmissionResponse[]> => {
+  const response = await api.get<RosterWeekAvailabilitySubmissionResponse[]>(
+    `/api/stores/${storeId}/roster-weeks/${rosterWeekId}/availability-submissions`
+  );
+  return response.data;
+};
